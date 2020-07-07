@@ -55,19 +55,19 @@ def initialize_django(settings_module: str) -> Tuple['Apps', 'LazySettings']:
     def noop_class_getitem(cls, key):
         return cls
 
-    try:
-        import configurations
-        configurations.setup()
-    except ModuleNotFoundError:
-        pass
-
     from django.db import models
 
     models.QuerySet.__class_getitem__ = classmethod(noop_class_getitem)  # type: ignore
     models.Manager.__class_getitem__ = classmethod(noop_class_getitem)  # type: ignore
 
     from django.conf import settings
-    settings.pre_setup()
+
+    try:
+        import configurations
+        configurations.setup()
+    except ModuleNotFoundError:
+        settings.pre_setup()
+
     from django.apps import apps
 
     apps.get_models.cache_clear()  # type: ignore
