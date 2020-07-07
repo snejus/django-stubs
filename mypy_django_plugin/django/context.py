@@ -49,27 +49,35 @@ def initialize_django(settings_module: str) -> Tuple['Apps', 'LazySettings']:
     with temp_environ():
         os.environ['DJANGO_SETTINGS_MODULE'] = settings_module
 
-        # add current directory to sys.path
-        sys.path.append(os.getcwd())
+    # add current directory to sys.path
+    sys.path.append(os.getcwd())
 
-        def noop_class_getitem(cls, key):
-            return cls
+    def noop_class_getitem(cls, key):
+        return cls
 
-        from django.db import models
+    try:
+        import configurations
+        configurations.setup()
+    except ModuleNotFoundError:
+        pass
 
-        models.QuerySet.__class_getitem__ = classmethod(noop_class_getitem)  # type: ignore
-        models.Manager.__class_getitem__ = classmethod(noop_class_getitem)  # type: ignore
+    from django.db import models
 
-        from django.conf import settings
-        from django.apps import apps
+    models.QuerySet.__class_getitem__ = classmethod(noop_class_getitem)  # type: ignore
+    models.Manager.__class_getitem__ = classmethod(noop_class_getitem)  # type: ignore
 
-        apps.get_models.cache_clear()  # type: ignore
-        apps.get_swappable_settings_name.cache_clear()  # type: ignore
+    from django.conf import settings
+    settings.pre_setup()
+    from django.apps import apps
 
-        if not settings.configured:
-            settings._setup()
+    apps.get_models.cache_clear()  # type: ignore
+    apps.get_swappable_settings_name.cache_clear()  # type: ignore
 
-        apps.populate(settings.INSTALLED_APPS)
+    if not settings.configured:
+        settings.pre_setup()
+        settings.setup()
+
+    apps.populate(settings.INSTALLED_APPS)
 
     assert apps.apps_ready
     assert settings.configured
