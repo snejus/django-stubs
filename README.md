@@ -79,8 +79,6 @@ But, it does not make any sense to use this project without `mypy`.
 
 For this same reason, you cannot use `reveal_type` inside global scope of any Python file that will be executed for `django.setup()`.
 
-
-
 In other words, if your `manage.py runserver` crashes, mypy will crash too.
 You can also run `mypy` with [`--tb`](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-show-traceback)
 option to get extra information about the error.
