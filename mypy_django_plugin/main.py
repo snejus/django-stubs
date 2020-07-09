@@ -1,6 +1,6 @@
 import configparser
 from functools import partial
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, cast
 
 from django.db.models.fields.related import RelatedField
 from mypy.errors import Errors
@@ -51,33 +51,37 @@ def add_new_manager_base(ctx: ClassDefContext) -> None:
         helpers.get_django_metadata(sym.node)['manager_bases'][ctx.cls.fullname] = 1
 
 
-def extract_django_settings_module(config_file_path: Optional[str]) -> str:
-    errors = Errors()
-    if config_file_path is None:
-        errors.report(0, None, "'django_settings_module' is not set: no mypy config file specified")
+def extract_django_config(config_file_path: Optional[str]) -> Dict[str, str]:
+
+    def raise_error(errors: Errors, reason: int, file_: Optional[str] = None) -> None:
+        message = {1: "'django_settings_module' is not set: no mypy config file specified",
+                   2: "'django_settings_module' is not set: no section [mypy.plugins.django-stubs]",
+                   3: "'django_settings_module' is not set: setting is not provided"}[reason]
+        errors.report(0, None, message, file=file_)
         errors.raise_error()
+
+    quit = partial(raise_error, Errors())
+    if config_file_path is None:
+        quit(1)
 
     parser = configparser.ConfigParser()
-    parser.read(config_file_path)  # type: ignore
+    parser.read(cast(str, config_file_path))
 
-    if not parser.has_section('mypy.plugins.django-stubs'):
-        errors.report(0, None, "'django_settings_module' is not set: no section [mypy.plugins.django-stubs]",
-                      file=config_file_path)
-        errors.raise_error()
-    if not parser.has_option('mypy.plugins.django-stubs', 'django_settings_module'):
-        errors.report(0, None, "'django_settings_module' is not set: setting is not provided",
-                      file=config_file_path)
-        errors.raise_error()
+    section = 'mypy.plugins.django-stubs'
+    if not parser.has_section(section):
+        quit(2, file_=config_file_path)
 
-    django_settings_module = parser.get('mypy.plugins.django-stubs', 'django_settings_module').strip('\'"')
-    return django_settings_module
+    settings = parser.get(section, 'django_settings_module', fallback="") or quit(3, file_=config_file_path)
+    hook = parser.get(section, 'django_pre_init_hook', fallback="")
+
+    return {'django_settings_module': cast(str, settings).strip('\'"'), 'django_pre_init_hook': hook.strip('\'"')}
 
 
 class NewSemanalDjangoPlugin(Plugin):
     def __init__(self, options: Options) -> None:
         super().__init__(options)
-        django_settings_module = extract_django_settings_module(options.config_file)
-        self.django_context = DjangoContext(django_settings_module)
+        django_config = extract_django_config(options.config_file)
+        self.django_context = DjangoContext(django_config)
 
     def _get_current_queryset_bases(self) -> Dict[str, int]:
         model_sym = self.lookup_fully_qualified(fullnames.QUERYSET_CLASS_FULLNAME)

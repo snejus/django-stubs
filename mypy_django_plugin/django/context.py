@@ -82,8 +82,8 @@ class LookupsAreUnsupported(Exception):
 
 
 class DjangoContext:
-    def __init__(self, django_settings_module: str) -> None:
-        self.django_settings_module = django_settings_module
+    def __init__(self, config: Dict[str, str]) -> None:
+        self.django_settings_module = config['django_settings_module']
 
         apps, settings = initialize_django(self.django_settings_module)
         self.apps_registry = apps
